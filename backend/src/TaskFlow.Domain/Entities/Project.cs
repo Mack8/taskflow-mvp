@@ -38,5 +38,19 @@ public class Project : BaseEntity
         Touch();
     }
 
+    public void RemoveMember(Guid userId)
+    {
+        if (userId == OwnerId)
+        {
+            throw new InvalidOperationException("The project owner cannot be removed from the project.");
+        }
+
+        var member = _members.FirstOrDefault(m => m.UserId == userId);
+        if (member is null) return;
+
+        _members.Remove(member);
+        Touch();
+    }
+
     public bool HasMember(Guid userId) => _members.Any(m => m.UserId == userId);
 }

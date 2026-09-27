@@ -70,7 +70,8 @@ builder.Services.AddAuthorization();
 
 builder.Services
     .AddGraphQLServer()
-    .AddQueryType<Query>();
+    .AddQueryType<Query>()
+    .AddAuthorization();
 
 builder.Services.AddCors(options =>
 {

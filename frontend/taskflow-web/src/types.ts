@@ -11,6 +11,16 @@ export interface AuthResult {
   token: string
 }
 
+export type UserRole = 'Member' | 'Admin'
+
+export interface UserSummary {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  createdAt: string
+}
+
 export interface Project {
   id: string
   name: string

@@ -24,4 +24,11 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
             .Include(p => p.Members)
             .Include(p => p.Tasks)
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+
+    public Task<List<Project>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        DbSet
+            .Include(p => p.Members)
+            .Include(p => p.Tasks)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
 }
