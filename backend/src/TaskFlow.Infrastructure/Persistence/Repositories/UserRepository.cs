@@ -13,4 +13,10 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
 
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
         DbSet.AnyAsync(u => u.Email == email.Trim().ToLowerInvariant(), cancellationToken);
+
+    public Task<bool> AnyAsync(CancellationToken cancellationToken = default) =>
+        DbSet.AnyAsync(cancellationToken);
+
+    public Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        DbSet.OrderBy(u => u.Name).ToListAsync(cancellationToken);
 }

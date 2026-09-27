@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { ProjectDetailPage } from './pages/ProjectDetailPage'
+import { AdminPage } from './pages/AdminPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 export default function App() {
@@ -27,6 +28,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireRole="Admin">
+              <AdminPage />
             </ProtectedRoute>
           }
         />

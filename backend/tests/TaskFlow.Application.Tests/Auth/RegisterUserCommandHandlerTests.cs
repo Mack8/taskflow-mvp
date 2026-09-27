@@ -4,6 +4,7 @@ using TaskFlow.Application.Auth.Commands;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Domain.Entities;
+using TaskFlow.Domain.Enums;
 using Xunit;
 
 namespace TaskFlow.Application.Tests.Auth;
@@ -32,6 +33,34 @@ public class RegisterUserCommandHandlerTests
         result.Email.Should().Be("new@user.com");
         _users.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_FirstUserEver_BecomesAdmin()
+    {
+        _users.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _users.Setup(r => r.AnyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _passwordHasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        _tokenGenerator.Setup(t => t.GenerateToken(It.IsAny<User>())).Returns("fake-jwt");
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new RegisterUserCommand("Ada", "first@user.com", "Password123!"), CancellationToken.None);
+
+        result.Role.Should().Be(nameof(UserRole.Admin));
+    }
+
+    [Fact]
+    public async Task Handle_NotTheFirstUser_BecomesMember()
+    {
+        _users.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _users.Setup(r => r.AnyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _passwordHasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        _tokenGenerator.Setup(t => t.GenerateToken(It.IsAny<User>())).Returns("fake-jwt");
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new RegisterUserCommand("Grace", "second@user.com", "Password123!"), CancellationToken.None);
+
+        result.Role.Should().Be(nameof(UserRole.Member));
     }
 
     [Fact]

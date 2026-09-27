@@ -40,4 +40,11 @@ public class ProjectsController : ControllerBase
         await _sender.Send(new AddProjectMemberCommand(projectId, userId), cancellationToken);
         return NoContent();
     }
+
+    [HttpDelete("{projectId:guid}/members/{userId:guid}")]
+    public async Task<IActionResult> RemoveMember(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new RemoveProjectMemberCommand(projectId, userId), cancellationToken);
+        return NoContent();
+    }
 }

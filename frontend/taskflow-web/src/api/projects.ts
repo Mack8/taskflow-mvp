@@ -8,3 +8,7 @@ export function createProject(name: string, description: string) {
 export function addProjectMember(projectId: string, userId: string) {
   return httpClient.post(`/api/projects/${projectId}/members/${userId}`)
 }
+
+export function removeProjectMember(projectId: string, userId: string) {
+  return httpClient.delete(`/api/projects/${projectId}/members/${userId}`)
+}

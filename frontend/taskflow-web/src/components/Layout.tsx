@@ -14,6 +14,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </Link>
         {user && (
           <div className="app-header-actions">
+            {user.role === 'Admin' && <Link to="/admin">Admin</Link>}
             <NotificationsBell />
             <span className="muted">{user.name}</span>
             <button className="secondary" onClick={logout}>

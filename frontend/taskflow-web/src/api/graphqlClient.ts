@@ -1,7 +1,7 @@
 import { GraphQLClient, gql } from 'graphql-request'
 import { GRAPHQL_URL } from './config'
 import { getToken } from './httpClient'
-import type { Project, ProjectDetail } from '../types'
+import type { Project, ProjectDetail, UserSummary } from '../types'
 
 // Reads go through GraphQL, writes go through REST (see ProjectsController /
 // TasksController) — a deliberate CQRS-flavored split so the client can shape
@@ -60,4 +60,43 @@ export async function fetchProjects(): Promise<Project[]> {
 export async function fetchProject(projectId: string): Promise<ProjectDetail> {
   const data = await client().request<{ project: ProjectDetail }>(PROJECT_QUERY, { projectId })
   return data.project
+}
+
+// Admin-only fields — the server rejects these for non-admins with a GraphQL
+// "AUTH_NOT_AUTHORIZED" error (see [Authorize(Roles = ...)] on Query.GetUsers
+// / Query.GetAllProjects), which graphql-request surfaces as a thrown error.
+const USERS_QUERY = gql`
+  query Users {
+    users {
+      id
+      name
+      email
+      role
+      createdAt
+    }
+  }
+`
+
+const ALL_PROJECTS_QUERY = gql`
+  query AllProjects {
+    allProjects {
+      id
+      name
+      description
+      ownerId
+      memberCount
+      taskCount
+      createdAt
+    }
+  }
+`
+
+export async function fetchUsers(): Promise<UserSummary[]> {
+  const data = await client().request<{ users: UserSummary[] }>(USERS_QUERY)
+  return data.users
+}
+
+export async function fetchAllProjects(): Promise<Project[]> {
+  const data = await client().request<{ allProjects: Project[] }>(ALL_PROJECTS_QUERY)
+  return data.allProjects
 }
