@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": { "value": "taskflow" },
+    "environmentName": { "value": "dev" },
+    "containerRegistryServer": { "value": "ghcr.io" },
+    "imageTag": { "value": "latest" },
+    "sqlAdminPassword": { "value": "<set via az deployment ... --parameters sqlAdminPassword=$SQL_ADMIN_PASSWORD>" },
+    "jwtSecretKey": { "value": "<set via az deployment ... --parameters jwtSecretKey=$JWT_SECRET_KEY>" }
+  }
+}

@@ -1,0 +1,24 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+*.user
+
+# Node / Vite
+frontend/**/node_modules/
+frontend/**/dist/
+frontend/**/.vite/
+
+# Env files with real secrets (examples are committed, real ones are not)
+.env
+frontend/**/.env
+frontend/**/.env.local
+
+# Editors / OS
+.vs/
+.vscode/
+*.swp
+.DS_Store
+
+# Test output
+**/TestResults/
+**/test-results/
