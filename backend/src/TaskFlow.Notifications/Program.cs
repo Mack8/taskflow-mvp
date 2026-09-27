@@ -1,3 +1,8 @@
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
 using TaskFlow.Notifications.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +12,39 @@ builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(Rab
 
 builder.Services.AddSingleton<NotificationRepository>();
 builder.Services.AddHostedService<NotificationEventConsumer>();
+
+// Must match the issuer, audience and signing key used by TaskFlow.Api.
+var jwt = builder.Configuration.GetSection("Jwt");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var signingKey = jwt["SecretKey"];
+        if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
+            throw new InvalidOperationException("Jwt:SecretKey must contain at least 32 UTF-8 bytes.");
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwt["Issuer"] ?? "TaskFlow",
+            ValidAudience = jwt["Audience"] ?? "TaskFlowClient",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                if (!Guid.TryParse(context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                    || userId == Guid.Empty)
+                    context.Fail("A valid user identity is required.");
+                return Task.CompletedTask;
+            }
+        };
+    });
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).ValidateOnStart();
+builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
 {
@@ -20,19 +58,28 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors("AllowFrontend");
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
-// Deliberately unauthenticated for the MVP: in production this would sit
-// behind the same JWT bearer scheme as TaskFlow.Api (or, on Azure, behind
-// API Management/App Service EasyAuth) validating the same signing key.
-app.MapGet("/api/notifications/{userId:guid}", async (Guid userId, NotificationRepository repository, CancellationToken ct) =>
-    Results.Ok(await repository.GetForUserAsync(userId, ct)));
+var notifications = app.MapGroup("/api/notifications").RequireAuthorization();
 
-app.MapPatch("/api/notifications/{id}/read", async (string id, NotificationRepository repository, CancellationToken ct) =>
+notifications.MapGet("/{userId:guid}", async (Guid userId, ClaimsPrincipal user, NotificationRepository repository, CancellationToken ct) =>
 {
-    var result = await repository.MarkAsReadAsync(id, ct);
+    var currentUserId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    if (userId != currentUserId) return Results.Forbid();
+    return Results.Ok(await repository.GetForUserAsync(currentUserId, ct));
+});
+
+notifications.MapPatch("/{id}/read", async (string id, ClaimsPrincipal user, NotificationRepository repository, CancellationToken ct) =>
+{
+    if (!ObjectId.TryParse(id, out _)) return Results.BadRequest();
+    var currentUserId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var result = await repository.MarkAsReadAsync(id, currentUserId, ct);
     return result.MatchedCount == 0 ? Results.NotFound() : Results.NoContent();
 });
 
 app.Run();
+
+public partial class NotificationsProgram { }

@@ -63,6 +63,7 @@ services:
       - "5081:8080"
     environment:
       Mongo__ConnectionString: "mongodb://mongo:27017"
+      Jwt__SecretKey: "local-dev-secret-key-change-me-1234567890"
       RabbitMq__HostName: rabbitmq
       Cors__AllowedOrigins__0: "http://localhost:5173"
     depends_on:

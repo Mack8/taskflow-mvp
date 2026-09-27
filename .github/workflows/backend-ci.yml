@@ -15,6 +15,16 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +51,13 @@ jobs:
           dotnet test backend/tests/TaskFlow.Api.IntegrationTests/TaskFlow.Api.IntegrationTests.csproj
           --configuration Release --no-build
           --logger "trx;LogFileName=api-integration-tests.trx"
+          --results-directory ./test-results
+
+      - name: Test — Notifications (integration, real MongoDB)
+        run: >
+          dotnet test backend/tests/TaskFlow.Notifications.IntegrationTests/TaskFlow.Notifications.IntegrationTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=notifications-integration-tests.trx"
           --results-directory ./test-results
 
       - name: Upload test results

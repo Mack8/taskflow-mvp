@@ -98,6 +98,8 @@ This starts SQL Server, MongoDB, RabbitMQ, both backend services, and the fronte
 
 Register two users from the UI (or via `POST /api/auth/register`), create a project with one, add the other as a member, create a task, assign it, and move it across the board — the assignee should see a notification appear (polled every 15s) within a few seconds, having round-tripped through RabbitMQ into MongoDB and back out over REST.
 
+Notifications require the same bearer token issued by the main API. Users (including admins) can only list and mark their own notifications as read. Listing another user's notifications returns 403; updating another user's notification returns 404. `/health` remains anonymous. Both services must use matching `Jwt__SecretKey`, `Jwt__Issuer` and `Jwt__Audience` settings. Compose supplies the same development key; when running Notifications separately, supply a signing key of at least 32 UTF-8 bytes through configuration. The service fails startup if the key is missing or too short.
+
 To stop and remove all data: `docker compose down -v`.
 
 ## Running the tests
@@ -114,7 +116,16 @@ cd frontend/taskflow-web
 npm test
 ```
 
-Both back-end test projects and the CI workflows run without any external dependency (SQL Server, RabbitMQ) — the integration tests swap in EF Core's InMemory provider and a fake in-process event bus (see `CustomWebApplicationFactory`), so `dotnet test` is self-contained.
+The Application and API test projects run without external services: API integration tests use EF Core's InMemory provider and a fake event bus. Notifications integration tests use real MongoDB to verify ownership filtering, with a unique temporary database per test fixture that is removed afterwards. They use the API's actual JWT generator and do not require RabbitMQ. Backend CI supplies MongoDB as a service.
+
+```bash
+# Start an isolated MongoDB instance for Notifications tests
+docker run --rm -d --name taskflow-test-mongo -p 127.0.0.1:27028:27017 mongo:7
+TEST_MONGO_CONNECTION=mongodb://localhost:27028 dotnet test backend/tests/TaskFlow.Notifications.IntegrationTests
+docker stop taskflow-test-mongo
+```
+
+Run these commands from the repository root. `TEST_MONGO_CONNECTION` defaults to `mongodb://localhost:27017` when omitted. Running the full solution's tests also requires this MongoDB instance.
 
 ## Repository layout
 

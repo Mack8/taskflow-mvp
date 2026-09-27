@@ -25,9 +25,9 @@ public class NotificationRepository
             .Limit(100)
             .ToListAsync(cancellationToken);
 
-    public Task<UpdateResult> MarkAsReadAsync(string id, CancellationToken cancellationToken = default) =>
+    public Task<UpdateResult> MarkAsReadAsync(string id, Guid userId, CancellationToken cancellationToken = default) =>
         _collection.UpdateOneAsync(
-            n => n.Id == id,
+            n => n.Id == id && n.UserId == userId,
             Builders<Notification>.Update.Set(n => n.IsRead, true),
             cancellationToken: cancellationToken);
 }

@@ -22,3 +22,6 @@ frontend/**/.env.local
 # Test output
 **/TestResults/
 **/test-results/
+
+# Local planning and backlog
+/docs/

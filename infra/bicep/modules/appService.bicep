@@ -73,6 +73,7 @@ resource notificationsApp 'Microsoft.Web/sites@2023-12-01' = {
       linuxFxVersion: 'DOCKER|${containerRegistryServer}/taskflow-mvp/taskflow-notifications:${imageTag}'
       appSettings: [
         { name: 'Mongo__ConnectionString', value: cosmosMongoConnectionString }
+        { name: 'Jwt__SecretKey', value: '@Microsoft.KeyVault(SecretUri=${jwtSecretVaultUri})' }
         { name: 'ServiceBus__ConnectionString', value: serviceBusConnectionString }
         { name: 'ApplicationInsights__ConnectionString', value: appInsightsConnectionString }
         { name: 'WEBSITES_PORT', value: '8080' }
@@ -95,6 +96,16 @@ resource apiKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     principalId: apiApp.identity.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6') // Key Vault Secrets User
+  }
+}
+
+resource notificationsKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVaultRef.id, notificationsApp.id, 'secrets-user')
+  scope: keyVaultRef
+  properties: {
+    principalId: notificationsApp.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
   }
 }
 
