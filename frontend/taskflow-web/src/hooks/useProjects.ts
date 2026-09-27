@@ -3,7 +3,7 @@ import { fetchProjects } from '../api/graphqlClient'
 import { createProject } from '../api/projects'
 
 export function useProjects() {
-  return useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
+  return useQuery({ queryKey: ['projects'], queryFn: ({ signal }) => fetchProjects(signal) })
 }
 
 export function useCreateProject() {

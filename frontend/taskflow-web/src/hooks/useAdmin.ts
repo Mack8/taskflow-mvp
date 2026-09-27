@@ -5,11 +5,11 @@ import { addProjectMember, removeProjectMember } from '../api/projects'
 import type { UserRole } from '../types'
 
 export function useUsers() {
-  return useQuery({ queryKey: ['admin', 'users'], queryFn: fetchUsers })
+  return useQuery({ queryKey: ['admin', 'users'], queryFn: ({ signal }) => fetchUsers(signal) })
 }
 
 export function useAllProjects() {
-  return useQuery({ queryKey: ['admin', 'allProjects'], queryFn: fetchAllProjects })
+  return useQuery({ queryKey: ['admin', 'allProjects'], queryFn: ({ signal }) => fetchAllProjects(signal) })
 }
 
 export function useCreateUser() {

@@ -29,7 +29,10 @@ httpClient.interceptors.request.use((config) => {
 httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const token = getToken()
+    // A response from a retired session must not clear the current session.
+    if (error.response?.status === 401 && token &&
+      error.config?.headers?.Authorization === `Bearer ${token}`) {
       setToken(null)
       window.location.href = '/login'
     }

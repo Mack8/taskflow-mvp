@@ -8,7 +8,7 @@ import { fetchNotifications, markNotificationRead } from '../api/notificationsCl
 export function useNotifications(userId: string | undefined) {
   return useQuery({
     queryKey: ['notifications', userId],
-    queryFn: () => fetchNotifications(userId!),
+    queryFn: ({ signal }) => fetchNotifications(userId!, signal),
     enabled: Boolean(userId),
     refetchInterval: 15_000,
   })

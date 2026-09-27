@@ -7,9 +7,10 @@ import type { Project, ProjectDetail, UserSummary } from '../types'
 // TasksController) — a deliberate CQRS-flavored split so the client can shape
 // exactly the read it needs (e.g. project + tasks in one round trip) while
 // commands keep the simplicity of plain HTTP verbs and status codes.
-function client() {
+function client(signal?: AbortSignal) {
   const token = getToken()
   return new GraphQLClient(GRAPHQL_URL, {
+    signal,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
 }
@@ -52,13 +53,13 @@ const PROJECT_QUERY = gql`
   }
 `
 
-export async function fetchProjects(): Promise<Project[]> {
-  const data = await client().request<{ projects: Project[] }>(PROJECTS_QUERY)
+export async function fetchProjects(signal?: AbortSignal): Promise<Project[]> {
+  const data = await client(signal).request<{ projects: Project[] }>(PROJECTS_QUERY)
   return data.projects
 }
 
-export async function fetchProject(projectId: string): Promise<ProjectDetail> {
-  const data = await client().request<{ project: ProjectDetail }>(PROJECT_QUERY, { projectId })
+export async function fetchProject(projectId: string, signal?: AbortSignal): Promise<ProjectDetail> {
+  const data = await client(signal).request<{ project: ProjectDetail }>(PROJECT_QUERY, { projectId })
   return data.project
 }
 
@@ -91,12 +92,12 @@ const ALL_PROJECTS_QUERY = gql`
   }
 `
 
-export async function fetchUsers(): Promise<UserSummary[]> {
-  const data = await client().request<{ users: UserSummary[] }>(USERS_QUERY)
+export async function fetchUsers(signal?: AbortSignal): Promise<UserSummary[]> {
+  const data = await client(signal).request<{ users: UserSummary[] }>(USERS_QUERY)
   return data.users
 }
 
-export async function fetchAllProjects(): Promise<Project[]> {
-  const data = await client().request<{ allProjects: Project[] }>(ALL_PROJECTS_QUERY)
+export async function fetchAllProjects(signal?: AbortSignal): Promise<Project[]> {
+  const data = await client(signal).request<{ allProjects: Project[] }>(ALL_PROJECTS_QUERY)
   return data.allProjects
 }

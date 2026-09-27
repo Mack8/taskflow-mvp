@@ -7,7 +7,7 @@ import type { TaskPriority, TaskStatus } from '../types'
 export function useProject(projectId: string) {
   return useQuery({
     queryKey: ['project', projectId],
-    queryFn: () => fetchProject(projectId),
+    queryFn: ({ signal }) => fetchProject(projectId, signal),
     enabled: Boolean(projectId),
   })
 }

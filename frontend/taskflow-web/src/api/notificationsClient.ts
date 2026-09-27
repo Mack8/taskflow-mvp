@@ -11,8 +11,8 @@ notificationsHttp.interceptors.request.use((config) => {
   return config
 })
 
-export async function fetchNotifications(userId: string): Promise<Notification[]> {
-  const { data } = await notificationsHttp.get<Notification[]>(`/api/notifications/${userId}`)
+export async function fetchNotifications(userId: string, signal?: AbortSignal): Promise<Notification[]> {
+  const { data } = await notificationsHttp.get<Notification[]>(`/api/notifications/${userId}`, { signal })
   return data
 }
 
