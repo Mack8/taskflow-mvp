@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { login, sessionExpired } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,6 +28,7 @@ export function LoginPage() {
     <div className="auth-page">
       <form className="card auth-card" onSubmit={handleSubmit}>
         <h2>Log in to TaskFlow</h2>
+        {sessionExpired && <p role="status">Your session has expired. Please log in again.</p>}
         {error && <p className="error-text">{error}</p>}
         <label>
           Email

@@ -1,6 +1,6 @@
-import { GraphQLClient, gql } from 'graphql-request'
+import { ClientError, GraphQLClient, gql } from 'graphql-request'
 import { GRAPHQL_URL } from './config'
-import { getToken } from './httpClient'
+import { captureSession, expireSession } from '../auth/session'
 import type { Project, ProjectDetail, UserSummary } from '../types'
 
 // Reads go through GraphQL, writes go through REST (see ProjectsController /
@@ -8,10 +8,16 @@ import type { Project, ProjectDetail, UserSummary } from '../types'
 // exactly the read it needs (e.g. project + tasks in one round trip) while
 // commands keep the simplicity of plain HTTP verbs and status codes.
 function client(signal?: AbortSignal) {
-  const token = getToken()
+  const session = captureSession()
   return new GraphQLClient(GRAPHQL_URL, {
     signal,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: session.token ? { Authorization: `Bearer ${session.token}` } : {},
+    responseMiddleware: (response) => {
+      if (response instanceof ClientError && (response.response.status === 401 ||
+        response.response.errors?.some((error) => error.extensions?.code === 'AUTH_NOT_AUTHENTICATED'))) {
+        expireSession(session)
+      }
+    },
   })
 }
 
