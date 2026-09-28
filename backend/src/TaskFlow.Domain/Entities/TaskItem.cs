@@ -41,6 +41,11 @@ public class TaskItem : BaseEntity
 
     public void ChangeStatus(TaskState newStatus, Guid changedByUserId)
     {
+        if (!Enum.IsDefined(newStatus))
+        {
+            throw new ArgumentOutOfRangeException(nameof(newStatus), newStatus, "Task status must be a defined TaskState value.");
+        }
+
         if (newStatus == Status) return;
 
         var oldStatus = Status;

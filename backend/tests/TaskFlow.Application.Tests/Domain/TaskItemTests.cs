@@ -35,6 +35,18 @@ public class TaskItemTests
     }
 
     [Fact]
+    public void ChangeStatus_ToUndefinedStatus_ThrowsWithoutChangingTaskOrRaisingEvent()
+    {
+        var task = TaskItem.Create(Guid.NewGuid(), "Write tests", "", TaskPriority.Medium, null);
+
+        var act = () => task.ChangeStatus((TaskState)99, Guid.NewGuid());
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+        task.Status.Should().Be(TaskState.Todo);
+        task.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void AssignTo_RaisesTaskAssignedEvent_WithAssigneeId()
     {
         var task = TaskItem.Create(Guid.NewGuid(), "Write tests", "", TaskPriority.High, null);

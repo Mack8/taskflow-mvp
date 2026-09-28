@@ -19,6 +19,28 @@ public class ChangeTaskStatusCommandHandlerTests
     private ChangeTaskStatusCommandHandler CreateHandler() =>
         new(_tasks.Object, _projects.Object, _unitOfWork.Object, _currentUser.Object);
 
+    [Theory]
+    [InlineData(TaskState.Todo)]
+    [InlineData(TaskState.InProgress)]
+    [InlineData(TaskState.InReview)]
+    [InlineData(TaskState.Done)]
+    public void Validator_DefinedStatus_IsValid(TaskState status)
+    {
+        var result = new ChangeTaskStatusCommandValidator()
+            .Validate(new ChangeTaskStatusCommand(Guid.NewGuid(), status));
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validator_UndefinedStatus_IsInvalid()
+    {
+        var result = new ChangeTaskStatusCommandValidator()
+            .Validate(new ChangeTaskStatusCommand(Guid.NewGuid(), (TaskState)99));
+
+        result.IsValid.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Handle_MemberOfProject_UpdatesStatus()
     {
@@ -63,5 +85,25 @@ public class ChangeTaskStatusCommandHandlerTests
         var act = () => handler.Handle(new ChangeTaskStatusCommand(Guid.NewGuid(), TaskState.Done), CancellationToken.None);
 
         await act.Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_UndefinedStatus_DoesNotCommit()
+    {
+        var userId = Guid.NewGuid();
+        var project = Project.Create("Demo", "", userId);
+        var task = TaskItem.Create(project.Id, "Ship it", "", TaskPriority.High, null);
+
+        _tasks.Setup(r => r.GetByIdAsync(task.Id, It.IsAny<CancellationToken>())).ReturnsAsync(task);
+        _projects.Setup(r => r.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
+        _currentUser.Setup(c => c.UserId).Returns(userId);
+
+        var handler = CreateHandler();
+        var act = () => handler.Handle(new ChangeTaskStatusCommand(task.Id, (TaskState)99), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        task.Status.Should().Be(TaskState.Todo);
+        task.DomainEvents.Should().BeEmpty();
+        _unitOfWork.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }
