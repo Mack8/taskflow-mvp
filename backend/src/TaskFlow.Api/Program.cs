@@ -92,6 +92,8 @@ if (bootstrapAdmin)
     await using var scope = app.Services.CreateAsyncScope();
     try
     {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
         var config = app.Configuration.GetSection("BootstrapAdmin");
         var created = await scope.ServiceProvider.GetRequiredService<AdminBootstrapper>()
             .InitializeAsync(config["Name"] ?? "", config["Email"] ?? "", config["Password"] ?? "");

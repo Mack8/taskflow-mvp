@@ -16,6 +16,18 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: BootstrapTest!12345
+        ports:
+          - 14339:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'BootstrapTest!12345' -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
       mongo:
         image: mongo:7
         ports:
@@ -58,6 +70,15 @@ jobs:
           dotnet test backend/tests/TaskFlow.Notifications.IntegrationTests/TaskFlow.Notifications.IntegrationTests.csproj
           --configuration Release --no-build
           --logger "trx;LogFileName=notifications-integration-tests.trx"
+          --results-directory ./test-results
+
+      - name: Test — Bootstrap (integration, real SQL Server)
+        env:
+          TEST_SQL_CONNECTION: Server=localhost,14339;User Id=sa;Password=BootstrapTest!12345;TrustServerCertificate=True
+        run: >
+          dotnet test backend/tests/TaskFlow.Bootstrap.IntegrationTests/TaskFlow.Bootstrap.IntegrationTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=bootstrap-integration-tests.trx"
           --results-directory ./test-results
 
       - name: Upload test results
