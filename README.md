@@ -44,7 +44,7 @@ docker compose run --rm \
   -e BootstrapAdmin__Name="Ada Admin" \
   -e BootstrapAdmin__Email="admin@example.com" \
   -e BootstrapAdmin__Password="ChangeMe123!" \
-  taskflow-api dotnet TaskFlow.Api.dll --bootstrap-admin
+  taskflow-api --bootstrap-admin
 ```
 
 This runs `AdminBootstrapper` (`backend/src/TaskFlow.Infrastructure/Auth/AdminBootstrapper.cs`), which holds a SQL Server application lock (`sp_getapplock`) for the duration of the transaction so concurrent invocations — or an invocation racing a concurrent public registration — can't both decide "no Admin exists yet" and both create one. It's a no-op if an Admin already exists, and it never promotes an existing account (an email that's already registered fails instead of being upgraded). The process exits immediately after; it never starts the HTTP server. Promoting someone to Admin after the first one exists is itself an admin action (`POST /api/admin/users`), not something self-registration or the bootstrap command does again.
