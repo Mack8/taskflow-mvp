@@ -34,4 +34,21 @@ describe('TaskCard', () => {
 
     expect(onAssign).toHaveBeenCalledWith('user-1')
   })
+
+  it('disables only the status action while its update is pending and shows its error', () => {
+    render(
+      <TaskCard
+        task={task}
+        memberIds={['user-1']}
+        onStatusChange={vi.fn()}
+        onAssign={vi.fn()}
+        isStatusUpdating
+        statusError="Task status is invalid."
+      />,
+    )
+
+    expect(screen.getByLabelText('Status')).toBeDisabled()
+    expect(screen.getByLabelText('Assignee')).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Task status is invalid.')
+  })
 })

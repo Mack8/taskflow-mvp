@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { PriorityBadge } from './PriorityBadge'
 import type { Task, TaskStatus } from '../types'
 
@@ -9,11 +8,22 @@ interface Props {
   memberIds: string[]
   onStatusChange: (status: TaskStatus) => void
   onAssign: (assigneeId: string) => void
+  isStatusUpdating?: boolean
+  isAssignmentUpdating?: boolean
+  statusError?: string | null
+  assignmentError?: string | null
 }
 
-export function TaskCard({ task, memberIds, onStatusChange, onAssign }: Props) {
-  const [assignee, setAssignee] = useState(task.assigneeId ?? '')
-
+export function TaskCard({
+  task,
+  memberIds,
+  onStatusChange,
+  onAssign,
+  isStatusUpdating = false,
+  isAssignmentUpdating = false,
+  statusError = null,
+  assignmentError = null,
+}: Props) {
   return (
     <div className="card task-card">
       <div className="task-card-header">
@@ -24,7 +34,7 @@ export function TaskCard({ task, memberIds, onStatusChange, onAssign }: Props) {
 
       <label className="field-inline">
         Status
-        <select value={task.status} onChange={(e) => onStatusChange(e.target.value as TaskStatus)}>
+        <select value={task.status} onChange={(e) => onStatusChange(e.target.value as TaskStatus)} disabled={isStatusUpdating}>
           {STATUSES.map((status) => (
             <option key={status} value={status}>
               {status}
@@ -32,15 +42,16 @@ export function TaskCard({ task, memberIds, onStatusChange, onAssign }: Props) {
           ))}
         </select>
       </label>
+      {statusError && <p className="error-text" role="alert">{statusError}</p>}
 
       <label className="field-inline">
         Assignee
         <select
-          value={assignee}
+          value={task.assigneeId ?? ''}
           onChange={(e) => {
-            setAssignee(e.target.value)
             if (e.target.value) onAssign(e.target.value)
           }}
+          disabled={isAssignmentUpdating}
         >
           <option value="">Unassigned</option>
           {memberIds.map((id) => (
@@ -50,6 +61,7 @@ export function TaskCard({ task, memberIds, onStatusChange, onAssign }: Props) {
           ))}
         </select>
       </label>
+      {assignmentError && <p className="error-text" role="alert">{assignmentError}</p>}
     </div>
   )
 }

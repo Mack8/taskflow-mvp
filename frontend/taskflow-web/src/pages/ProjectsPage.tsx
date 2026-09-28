@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { mutationErrorMessage } from '../api/errorMessage'
 import { ProjectCard } from '../components/ProjectCard'
 import { useCreateProject, useProjects } from '../hooks/useProjects'
 
@@ -35,6 +36,11 @@ export function ProjectsPage() {
             {createProject.isPending ? 'Creating…' : 'Create'}
           </button>
         </div>
+        {createProject.error && (
+          <p className="error-text" role="alert">
+            {mutationErrorMessage(createProject.error, 'Could not create the project. Please try again.')}
+          </p>
+        )}
       </form>
 
       {isLoading && <p className="muted">Loading projects…</p>}

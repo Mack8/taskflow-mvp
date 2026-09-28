@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../components/StatusBadge'
 import { TaskCard } from '../components/TaskCard'
+import { mutationErrorMessage } from '../api/errorMessage'
+import { useAuth } from '../auth/AuthContext'
 import { useProject, useProjectMutations } from '../hooks/useProject'
 import type { Task, TaskPriority, TaskStatus } from '../types'
 
@@ -10,6 +12,7 @@ const PRIORITIES: TaskPriority[] = ['Low', 'Medium', 'High', 'Critical']
 
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const { user } = useAuth()
   const { data: project, isLoading, isError } = useProject(projectId!)
   const { createTaskMutation, changeStatusMutation, assignMutation, addMemberMutation } = useProjectMutations(projectId!)
 
@@ -36,6 +39,7 @@ export function ProjectDetailPage() {
   if (isError || !project) return <div className="page error-text">Could not load this project.</div>
 
   const tasksByStatus = (status: TaskStatus): Task[] => project.tasks.filter((t) => t.status === status)
+  const canManageMembers = user?.role === 'Admin' || user?.userId === project.ownerId
 
   return (
     <div className="page">
@@ -57,17 +61,32 @@ export function ProjectDetailPage() {
             {createTaskMutation.isPending ? 'Adding…' : 'Add task'}
           </button>
         </form>
+        {createTaskMutation.error && (
+          <p className="error-text" role="alert">
+            {mutationErrorMessage(createTaskMutation.error, 'Could not add task. Please try again.')}
+          </p>
+        )}
 
-        <form className="form-row" onSubmit={handleAddMember}>
-          <input
-            placeholder="Add member by user id (from /api/auth/register response)"
-            value={newMemberId}
-            onChange={(e) => setNewMemberId(e.target.value)}
-          />
-          <button type="submit" disabled={addMemberMutation.isPending}>
-            Add member
-          </button>
-        </form>
+        {canManageMembers && (
+          <>
+            <form className="form-row" onSubmit={handleAddMember}>
+              <input
+                placeholder="Add member by user id (from /api/auth/register response)"
+                value={newMemberId}
+                onChange={(e) => setNewMemberId(e.target.value)}
+                disabled={addMemberMutation.isPending}
+              />
+              <button type="submit" disabled={addMemberMutation.isPending}>
+                {addMemberMutation.isPending ? 'Adding…' : 'Add member'}
+              </button>
+            </form>
+            {addMemberMutation.error && (
+              <p className="error-text" role="alert">
+                {mutationErrorMessage(addMemberMutation.error, 'Could not add the member. Please try again.')}
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="board">
@@ -81,6 +100,14 @@ export function ProjectDetailPage() {
                 memberIds={project.memberIds}
                 onStatusChange={(newStatus) => changeStatusMutation.mutate({ taskId: task.id, status: newStatus })}
                 onAssign={(assigneeId) => assignMutation.mutate({ taskId: task.id, assigneeId })}
+                isStatusUpdating={changeStatusMutation.isPending && changeStatusMutation.variables?.taskId === task.id}
+                isAssignmentUpdating={assignMutation.isPending && assignMutation.variables?.taskId === task.id}
+                statusError={changeStatusMutation.variables?.taskId === task.id && changeStatusMutation.error
+                  ? mutationErrorMessage(changeStatusMutation.error, 'Could not update the task status. Please try again.')
+                  : null}
+                assignmentError={assignMutation.variables?.taskId === task.id && assignMutation.error
+                  ? mutationErrorMessage(assignMutation.error, 'Could not assign the task. Please try again.')
+                  : null}
               />
             ))}
             {tasksByStatus(status).length === 0 && <p className="muted empty-column">No tasks</p>}
