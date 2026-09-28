@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
@@ -9,31 +8,21 @@ using TaskFlow.Domain.Common;
 
 namespace TaskFlow.Infrastructure.Messaging;
 
-// Publishes domain events to a durable topic exchange. Routing key is the CLR
-// type name (e.g. "TaskAssignedEvent") so the Notifications microservice can
-// bind a queue to just the events it cares about instead of consuming everything.
-// Swapping this for an Azure Service Bus implementation behind IEventBus is the
-// only change needed to run the same Application layer in Azure (see infra/bicep).
+// Publishes persisted integration events to a durable topic exchange. The type
+// remains the routing key (e.g. "TaskAssignedEvent") so Notifications binds
+// only the messages it needs. Publisher confirms decide whether outbox rows can
+// be marked delivered.
 public class RabbitMqEventBus : IEventBus, IDisposable
 {
     private readonly RabbitMqOptions _options;
     private readonly ILogger<RabbitMqEventBus> _logger;
-    private readonly Lazy<IConnection> _connection;
-
-    // The Notifications microservice's event contracts declare enums (e.g.
-    // TaskState) as strings, matching the string columns EF Core writes them
-    // as. Without this converter, System.Text.Json's default is numeric,
-    // which the consumer's string-typed contract then fails to deserialize.
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
+    private readonly object _connectionLock = new();
+    private IConnection? _connection;
 
     public RabbitMqEventBus(IOptions<RabbitMqOptions> options, ILogger<RabbitMqEventBus> logger)
     {
         _options = options.Value;
         _logger = logger;
-        _connection = new Lazy<IConnection>(CreateConnection);
     }
 
     private IConnection CreateConnection()
@@ -49,52 +38,49 @@ public class RabbitMqEventBus : IEventBus, IDisposable
         return factory.CreateConnection("taskflow-api");
     }
 
-    public Task PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
+    public Task PublishAsync(IntegrationEvent integrationEvent, CancellationToken cancellationToken = default)
     {
-        try
+        cancellationToken.ThrowIfCancellationRequested();
+        using var channel = GetConnection().CreateModel();
+        channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
+        channel.ConfirmSelect();
+
+        using var payloadDocument = JsonDocument.Parse(integrationEvent.Payload);
+        var envelope = new
         {
-            using var channel = _connection.Value.CreateModel();
-            channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
+            EventId = integrationEvent.EventId,
+            integrationEvent.EventType,
+            integrationEvent.OccurredOn,
+            Payload = payloadDocument.RootElement.Clone()
+        };
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
 
-            var routingKey = domainEvent.GetType().Name;
+        var properties = channel.CreateBasicProperties();
+        properties.Persistent = true;
+        properties.ContentType = "application/json";
+        properties.MessageId = integrationEvent.EventId.ToString();
 
-            // domainEvent.GetType() (the RUNTIME type, e.g. TaskAssignedEvent) is
-            // passed explicitly here. Letting Payload take its compile-time type
-            // (IDomainEvent) instead would make System.Text.Json serialize only
-            // that interface's members — just OccurredOn — silently dropping every
-            // other field (TaskId, AssigneeId, ...) with no error.
-            var payload = JsonSerializer.SerializeToElement(domainEvent, domainEvent.GetType(), JsonOptions);
-            var envelope = new
-            {
-                EventType = routingKey,
-                OccurredOn = domainEvent.OccurredOn,
-                Payload = payload
-            };
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
-
-            var properties = channel.CreateBasicProperties();
-            properties.Persistent = true;
-            properties.ContentType = "application/json";
-
-            channel.BasicPublish(_options.Exchange, routingKey, properties, body);
-            _logger.LogInformation("Published {EventType} to exchange {Exchange}", routingKey, _options.Exchange);
-        }
-        catch (Exception ex)
-        {
-            // A broker outage should never take down a write request; the event
-            // is logged and dropped. A production system would add an outbox
-            // table here instead of failing open.
-            _logger.LogError(ex, "Failed to publish domain event {EventType}", domainEvent.GetType().Name);
-        }
+        channel.BasicPublish(_options.Exchange, integrationEvent.EventType, properties, body);
+        channel.WaitForConfirmsOrDie(TimeSpan.FromSeconds(5));
+        _logger.LogInformation("Published outbox event {EventId} ({EventType}) to exchange {Exchange}",
+            integrationEvent.EventId, integrationEvent.EventType, _options.Exchange);
 
         return Task.CompletedTask;
     }
 
+    private IConnection GetConnection()
+    {
+        lock (_connectionLock)
+        {
+            if (_connection?.IsOpen == true) return _connection;
+            _connection?.Dispose();
+            _connection = CreateConnection();
+            return _connection;
+        }
+    }
+
     public void Dispose()
     {
-        if (_connection.IsValueCreated)
-        {
-            _connection.Value.Dispose();
-        }
+        _connection?.Dispose();
     }
 }

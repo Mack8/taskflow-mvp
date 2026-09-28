@@ -14,15 +14,18 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
         services.AddSingleton<IEventBus, RabbitMqEventBus>();
+        services.AddScoped<OutboxProcessor>();
+        services.AddHostedService<OutboxPublisher>();
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("SqlServer")));
 
         // Same DbContext instance answers both seams: IApplicationDbContext for
-        // raw DbSet access and IUnitOfWork for the commit-then-publish flow.
+        // raw DbSet access and IUnitOfWork for the transactional outbox write.
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 

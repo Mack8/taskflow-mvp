@@ -59,13 +59,13 @@ public class SqlApiFactory : WebApplicationFactory<Program>
     {
         await base.DisposeAsync();
         await using var db = new ApplicationDbContext(
-            new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(_connection).Options, new NoEvents());
+            new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(_connection).Options);
         await db.Database.EnsureDeletedAsync();
     }
 
     private class NoEvents : IEventBus
     {
-        public Task PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PublishAsync(IntegrationEvent integrationEvent, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
 

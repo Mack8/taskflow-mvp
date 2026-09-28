@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Domain.Common;
@@ -7,35 +9,32 @@ namespace TaskFlow.Infrastructure.Persistence;
 
 public class ApplicationDbContext : DbContext, IApplicationDbContext, IUnitOfWork
 {
-    private readonly IEventBus _eventBus;
-
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IEventBus eventBus) : base(options)
+    private static readonly JsonSerializerOptions EventJsonOptions = new()
     {
-        _eventBus = eventBus;
-    }
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 
-    // Unit of Work entry point used by every command handler. Domain events
-    // recorded on aggregates during this unit of work are only published to
-    // the message broker AFTER SaveChanges succeeds — publishing before commit
-    // could tell the Notifications service about a change that then rolls back.
+    // Domain changes and their delivery records are saved together. A separate
+    // publisher handles broker I/O only after this transaction commits.
     public async Task<int> CommitAsync(CancellationToken cancellationToken = default)
     {
         var entitiesWithEvents = ChangeTracker.Entries<BaseEntity>()
             .Select(e => e.Entity)
             .Where(e => e.DomainEvents.Count != 0)
             .ToList();
-
-        var result = await SaveChangesAsync(cancellationToken);
 
         foreach (var entity in entitiesWithEvents)
         {
@@ -44,10 +43,15 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext, IUnitOfWor
 
             foreach (var domainEvent in events)
             {
-                await _eventBus.PublishAsync(domainEvent, cancellationToken);
+                var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), EventJsonOptions);
+                OutboxMessages.Add(new OutboxMessage(
+                    Guid.NewGuid(),
+                    domainEvent.GetType().Name,
+                    domainEvent.OccurredOn,
+                    payload));
             }
         }
 
-        return result;
+        return await SaveChangesAsync(cancellationToken);
     }
 }

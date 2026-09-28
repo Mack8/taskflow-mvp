@@ -7,7 +7,7 @@ namespace TaskFlow.Notifications.Models;
 // decoupling — this service can evolve its own contract copy without forcing
 // a synchronized deploy with the Api service, at the cost of the two staying
 // in sync by convention instead of by compiler.
-public record EventEnvelope(string EventType, DateTimeOffset OccurredOn, System.Text.Json.JsonElement Payload);
+public record EventEnvelope(string EventType, DateTimeOffset OccurredOn, System.Text.Json.JsonElement Payload, Guid? EventId = null);
 
 public record TaskAssignedEvent(Guid TaskId, Guid ProjectId, string TaskTitle, Guid AssigneeId, Guid AssignedByUserId);
 

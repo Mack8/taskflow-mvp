@@ -8,11 +8,11 @@ namespace TaskFlow.Api.IntegrationTests;
 // assert "an event was raised" without touching RabbitMQ.
 public class FakeEventBus : IEventBus
 {
-    public List<IDomainEvent> PublishedEvents { get; } = new();
+    public List<IntegrationEvent> PublishedEvents { get; } = new();
 
-    public Task PublishAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
+    public Task PublishAsync(IntegrationEvent integrationEvent, CancellationToken cancellationToken = default)
     {
-        PublishedEvents.Add(domainEvent);
+        PublishedEvents.Add(integrationEvent);
         return Task.CompletedTask;
     }
 }
