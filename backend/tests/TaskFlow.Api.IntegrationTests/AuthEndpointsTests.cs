@@ -31,6 +31,7 @@ public class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
         registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var registered = await registerResponse.Content.ReadFromJsonAsync<AuthResultDto>();
         registered!.Token.Should().NotBeNullOrWhiteSpace();
+        registered.Role.Should().Be("Member");
 
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "SuperSecret123!" });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);

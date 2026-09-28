@@ -11,7 +11,8 @@ using TaskFlow.Infrastructure;
 using TaskFlow.Infrastructure.Auth;
 using TaskFlow.Infrastructure.Persistence;
 
-var builder = WebApplication.CreateBuilder(args);
+var bootstrapAdmin = args.Contains("--bootstrap-admin", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(a => a != "--bootstrap-admin").ToArray());
 
 // Enums travel as their string names (e.g. "InProgress") over the wire in both
 // directions, matching the string-typed enum columns in EF Core and the plain
@@ -83,6 +84,28 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+if (bootstrapAdmin)
+{
+    // Credentials come from operator-controlled configuration, not a public
+    // endpoint. Schema migrations must be applied before this one-off command.
+    await using var scope = app.Services.CreateAsyncScope();
+    try
+    {
+        var config = app.Configuration.GetSection("BootstrapAdmin");
+        var created = await scope.ServiceProvider.GetRequiredService<AdminBootstrapper>()
+            .InitializeAsync(config["Name"] ?? "", config["Email"] ?? "", config["Password"] ?? "");
+        app.Logger.LogInformation(created ? "Initial administrator created." : "An administrator already exists; no changes made.");
+    }
+    catch (Exception ex)
+    {
+        // Avoid logging configuration values, passwords or SQL parameters.
+        app.Logger.LogError("Administrator initialization failed ({ErrorType}). Check credentials, email availability, database access and applied migrations.", ex.GetType().Name);
+        Environment.ExitCode = 1;
+    }
+    await app.DisposeAsync();
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {

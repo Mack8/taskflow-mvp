@@ -36,24 +36,22 @@ public class RegisterUserCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_FirstUserEver_BecomesAdmin()
+    public async Task Handle_FirstUserEver_BecomesMember()
     {
         _users.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _users.Setup(r => r.AnyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _passwordHasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
         _tokenGenerator.Setup(t => t.GenerateToken(It.IsAny<User>())).Returns("fake-jwt");
 
         var handler = CreateHandler();
         var result = await handler.Handle(new RegisterUserCommand("Ada", "first@user.com", "Password123!"), CancellationToken.None);
 
-        result.Role.Should().Be(nameof(UserRole.Admin));
+        result.Role.Should().Be(nameof(UserRole.Member));
     }
 
     [Fact]
     public async Task Handle_NotTheFirstUser_BecomesMember()
     {
         _users.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _users.Setup(r => r.AnyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _passwordHasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
         _tokenGenerator.Setup(t => t.GenerateToken(It.IsAny<User>())).Returns("fake-jwt");
 

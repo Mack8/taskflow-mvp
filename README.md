@@ -33,7 +33,21 @@ A small but complete project/task-management platform (think a minimal Jira), bu
 
 ## Roles and admin capabilities
 
-Every user is either a `Member` or an `Admin`. There's no seed data and no setup wizard: **the first account ever registered on a fresh instance becomes Admin automatically** (see the comment in `RegisterUserCommandHandler`); every account after that is a plain `Member`. Promoting someone to Admin after that point is itself an admin action, not something self-registration can do.
+Every user is either a `Member` or an `Admin`. Public self-registration (`POST /api/auth/register`) always creates a `Member`, even on a completely empty database — there's no "first user becomes Admin" shortcut, because that would let whoever registers first on a freshly deployed, still-empty instance claim Admin for themselves.
+
+Instead, the very first Admin is created by an operator, not a visitor, via a one-off CLI command:
+
+```bash
+# Set BootstrapAdmin:Name / :Email / :Password (env vars, appsettings, or Key Vault
+# in Azure), then run the API once with --bootstrap-admin instead of serving requests:
+docker compose run --rm \
+  -e BootstrapAdmin__Name="Ada Admin" \
+  -e BootstrapAdmin__Email="admin@example.com" \
+  -e BootstrapAdmin__Password="ChangeMe123!" \
+  taskflow-api dotnet TaskFlow.Api.dll --bootstrap-admin
+```
+
+This runs `AdminBootstrapper` (`backend/src/TaskFlow.Infrastructure/Auth/AdminBootstrapper.cs`), which holds a SQL Server application lock (`sp_getapplock`) for the duration of the transaction so concurrent invocations — or an invocation racing a concurrent public registration — can't both decide "no Admin exists yet" and both create one. It's a no-op if an Admin already exists, and it never promotes an existing account (an email that's already registered fails instead of being upgraded). The process exits immediately after; it never starts the HTTP server. Promoting someone to Admin after the first one exists is itself an admin action (`POST /api/admin/users`), not something self-registration or the bootstrap command does again.
 
 What an Admin can do that a Member can't:
 
@@ -127,6 +141,18 @@ docker stop taskflow-test-mongo
 
 Run these commands from the repository root. `TEST_MONGO_CONNECTION` defaults to `mongodb://localhost:27017` when omitted. Running the full solution's tests also requires this MongoDB instance.
 
+`TaskFlow.Bootstrap.IntegrationTests` verifies the Admin bootstrap command (concurrent bootstraps, concurrent bootstrap-vs-registration races, repeated invocation, and email conflicts) against a real SQL Server — EF Core's InMemory provider doesn't execute `sp_getapplock` and so can't demonstrate the mutual exclusion the test suite exists to prove. It creates and drops its own database per test run and needs its own isolated SQL Server instance, since it exercises real transactions and locks that would interfere with other tests sharing a server:
+
+```bash
+docker run --rm -d --name taskflow-test-sql -p 127.0.0.1:14339:1433 \
+  -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD='BootstrapTest!12345' \
+  mcr.microsoft.com/mssql/server:2022-latest
+dotnet test backend/tests/TaskFlow.Bootstrap.IntegrationTests
+docker stop taskflow-test-sql
+```
+
+`TEST_SQL_CONNECTION` defaults to `Server=localhost,14339;User Id=sa;Password=BootstrapTest!12345;TrustServerCertificate=True` when omitted; only override it if you point the tests at a different instance.
+
 ## Repository layout
 
 ```
@@ -140,6 +166,7 @@ backend/
   tests/
     TaskFlow.Application.Tests/       unit tests (domain rules + handlers, mocked ports)
     TaskFlow.Api.IntegrationTests/    WebApplicationFactory tests against the real HTTP pipeline
+    TaskFlow.Bootstrap.IntegrationTests/  Admin bootstrap concurrency tests against real SQL Server
 frontend/
   taskflow-web/               React + TypeScript (Vite), React Query, React Router
 infra/

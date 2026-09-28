@@ -33,16 +33,9 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, A
             throw new ConflictException($"Email \"{request.Email}\" is already registered.");
         }
 
-        // No seed data, no separate setup wizard: the very first account ever
-        // registered on a fresh instance becomes Admin so there's always a way
-        // in to create/manage everyone else. Every account after that is a
-        // plain Member — promoting someone else to Admin is an Admin action
-        // (see Users/Commands/CreateUserCommand), not something self-registration
-        // can do.
-        var isFirstUser = !await _users.AnyAsync(cancellationToken);
-        var role = isFirstUser ? UserRole.Admin : UserRole.Member;
-
-        var user = User.Register(request.Name, request.Email, _passwordHasher.Hash(request.Password), role);
+        // Public registration never grants administrative privileges, even on
+        // an empty database. Initial administration is an operator-only command.
+        var user = User.Register(request.Name, request.Email, _passwordHasher.Hash(request.Password), UserRole.Member);
 
         await _users.AddAsync(user, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
