@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using HotChocolate.AspNetCore;
+using HotChocolate.AspNetCore.Serialization;
 using TaskFlow.Api.GraphQL;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Application;
@@ -68,6 +70,14 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// GraphQL clients in this MVP treat resolver failures as `errors` in a valid
+// response. Legacy transport preserves the established application/json + 200
+// contract for well-formed operations, including field-level authorization.
+builder.Services.AddHttpResponseFormatter(new HttpResponseFormatterOptions
+{
+    HttpTransportVersion = HttpTransportVersion.Legacy
+});
 
 builder.Services
     .AddGraphQLServer()
